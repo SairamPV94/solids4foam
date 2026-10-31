@@ -55,9 +55,10 @@ tutorial itself is never modified. Standard library only. A manifest,
 work/manifest.json, records every case with the SHA-256 of its inputs.
 
 Usage:
-    ./Allverify [run] [--runs ...]   generate, run locally, analyse, check
+    ./Allverify [run] [--runs ...]   generate and run locally (then analyse,
+                                     check)
     ./Allverify unit                 exact tests that need no OpenFOAM
-    ./Allverify dry-run --runs ...   list the cases, ranks and observed cost
+    ./Allverify dry-run --runs ...   list the cases and ranks
     ./Allverify generate --runs ...  generate the cases only
     ./Allverify status               state of the cases in the manifest
     ./Allverify analyse              analyse the completed cases
@@ -125,10 +126,9 @@ N_MODES = 150                       # modes of the initial-value solution
 N_SIMPSON = 1500                    # Simpson intervals of the mode integrals
 
 # Predefined check tolerances, independent of the measured values
-CHECK_SHEAR_AMP = 0.02              # |difference of the amplitude error|
-CHECK_VELOCITY = 5e-4               # |difference of u_L2_all_ivp|
+CHECK_SHEAR_AMP = 0.005             # |difference of the amplitude error|
+CHECK_VELOCITY = 2e-4               # |difference of u_L2_all_ivp|
 CHECK_CLOSED_FORM = 1e-9            # exact tau against rho nu du/ds
-CHECK_TRANSIENT = 0.0               # (reported, not a criterion)
 
 # Observed allocated rank-hours of the tracked runs (filled from the data)
 OBSERVED_RANK_HOURS = {}
@@ -370,6 +370,20 @@ def shear_series(columns: dict, method: str, estimator: str,
         f = [r[0] for r in columns[key]]
     else:
         f = [a[0] + b[0] for a, b in zip(columns["force"], columns["inertia"])]
+    return columns["t"], [x / area for x in f]
+
+
+def aligned_shear_series(columns: dict, area: float) -> tuple:
+    """Diagnostic for penalty, incremental and ghostCell: the inertia column
+    is a backward difference, (M_n - M_(n-1))/dt, centred at t_n - dt/2,
+    while the forcing is attributed to t_n. Here the inertia is averaged over
+    two successive steps, which centres it at t_n (the last row keeps its
+    own value). The solver output is unchanged; this is a post-processing
+    variant reported next to the tutorial's (columns with the suffix _al)"""
+    inertia = [b[0] for b in columns["inertia"]]
+    centred = [0.5 * (inertia[i] + inertia[min(i + 1, len(inertia) - 1)])
+               for i in range(len(inertia))]
+    f = [a[0] + c for a, c in zip(columns["force"], centred)]
     return columns["t"], [x / area for x in f]
 
 
@@ -736,10 +750,25 @@ def solver_problem(case: Path) -> str:
 
 
 def cmd_run(args) -> int:
-    cmd_generate(args)
     manifest = load_manifest()
+    todo = []
+    for item in plan(args):
+        entry = manifest["cases"].get(item[3], {})
+        if entry.get("state") == "completed" and \
+                (CASES_DIR / item[3]).exists() and not args.force:
+            print(f"{item[3]}: completed, kept (use --force to rerun)")
+        else:
+            todo.append(item)
+    for method, est, level, name, ranks, dt in todo:
+        case = generate_case(method, est, level, name, ranks, True, dt=dt)
+        manifest["cases"][name] = {
+            "method": method, "estimator": est, "level": level, "dt": dt,
+            "ranks": ranks, "inputs_sha256": input_hashes(case),
+            "generated": datetime.now().isoformat(timespec="seconds")}
+        print(f"{name}: generated in {case}")
+    save_manifest(manifest)
     status = 0
-    for method, est, level, name, ranks, dt in plan(args):
+    for method, est, level, name, ranks, dt in todo:
         reason = check_environment(ranks)
         entry = manifest["cases"][name]
         if reason:
@@ -799,6 +828,12 @@ def analyse_case(case: Path, method: str, est: str, level: int,
                "dt": dict_scalar(dt_text, "deltaT"), "steps": len(t),
                "wall_s": wall_seconds(case), "covered_volume": covered}
         row.update(shear_metrics(p, t, tau))
+        if method != "cutLink":
+            ta, taua = aligned_shear_series(cols, area)
+            al = shear_metrics(p, ta, taua)
+            for key in ("shear_amp_err_ivp", "shear_phase_err_deg_ivp",
+                        "shear_rms_err_ivp"):
+                row[key[:-4] + "_al"] = al[key]
         row.update(vel)
         rows.append(row)
         series[lab] = (t, tau)
@@ -824,7 +859,8 @@ FIELDS = (["method", "estimator", "level", "cells", "ranks", "dt", "steps",
            "shear_amp", "shear_amp_exact", "shear_amp_err",
            "shear_phase_err_deg", "shear_rms_err", "shear_mean",
            "shear_noise", "shear_amp_err_ivp", "shear_phase_err_deg_ivp",
-           "shear_rms_err_ivp"]
+           "shear_rms_err_ivp", "shear_amp_err_al", "shear_phase_err_deg_al",
+           "shear_rms_err_al"]
           + [f"u_{n}_{s}" for s in ("all", "near", "iface")
              for n in ("L1", "L2", "Linf")]
           + [f"u_{n}_all_ivp" for n in ("L1", "L2", "Linf")]
@@ -950,7 +986,11 @@ def cmd_check(args) -> int:
         results += check_tracked(tracked, p)
     else:
         results.append(("SKIPPED", "no tracked results"))
-    done = completed_cases(load_manifest())
+    manifest = load_manifest()
+    for name, entry in sorted(manifest["cases"].items()):
+        if entry.get("state") == "failed":
+            results.append(("FAIL", f"{name}: the run failed"))
+    done = completed_cases(manifest)
     if not done:
         results.append(("SKIPPED", "no completed case in work/ "
                         "(run ./Allverify)"))
@@ -1039,6 +1079,36 @@ def time_step_table(rows: list) -> str:
     return head + "\n".join(lines) + "\n"
 
 
+def aligned_table(rows: list) -> str:
+    """Shear amplitude, phase and RMS error against the initial-value
+    solution of penalty, incremental and ghostCell, as the solver writes the
+    inertia and with the inertia averaged over two steps (diagnostic), at
+    the tutorial step and at 0.00025 s"""
+    head = ("| Method | Level | dt (s) | Amplitude error | Phase error (deg) | "
+            "RMS error | Amplitude error, aligned | Phase error, aligned | "
+            "RMS error, aligned |\n| --- | --- | --- | --- | --- | --- | --- "
+            "| --- | --- |\n")
+    lines = []
+    for method in ("penalty", "incremental", "ghostCell"):
+        for level in (2, 3, 4):
+            for dt in (TUTORIAL_DT, 0.00025):
+                hit = [r for r in rows if r["method"] == method
+                       and int(r["level"]) == level
+                       and abs(row_dt(r) - dt) < 1e-12 and r.get("shear_amp_err_al")]
+                if not hit:
+                    continue
+                r = hit[0]
+                lines.append(
+                    f"| {method_label(r)} | {level} | {fmt(dt)} | "
+                    f"{100 * float(r['shear_amp_err_ivp']):+.2f} % | "
+                    f"{float(r['shear_phase_err_deg_ivp']):+.2f} | "
+                    f"{100 * float(r['shear_rms_err_ivp']):.2f} % | "
+                    f"{100 * float(r['shear_amp_err_al']):+.2f} % | "
+                    f"{float(r['shear_phase_err_deg_al']):+.2f} | "
+                    f"{100 * float(r['shear_rms_err_al']):.2f} % |")
+    return head + "\n".join(lines) + "\n"
+
+
 def cmd_tables(args) -> int:
     rows = read_results()
     if not rows:
@@ -1046,6 +1116,7 @@ def cmd_tables(args) -> int:
     print(master_table(rows, "periodic"))
     print(master_table(rows, "ivp"))
     print(time_step_table(rows))
+    print(aligned_table(rows))
     return 0
 
 

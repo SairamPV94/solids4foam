@@ -633,7 +633,7 @@ class DriverBehaviourTests(unittest.TestCase):
     def test_check_case_tolerances(self):
         row = {"method": "penalty", "estimator": "", "level": 1,
                "shear_amp_err": "-0.2", "u_L2_all_ivp": "0.05"}
-        ref = {"shear_amp_err": "-0.21", "u_L2_all_ivp": "0.0502"}
+        ref = {"shear_amp_err": "-0.202", "u_L2_all_ivp": "0.05005"}
         self.assertTrue(all(s == "PASS" for s, _ in v.check_case(row, ref)))
         ref = {"shear_amp_err": "-0.30", "u_L2_all_ivp": "0.06"}
         self.assertEqual([s for s, _ in v.check_case(row, ref)], ["FAIL", "FAIL"])
@@ -691,6 +691,35 @@ class CoveredVolumeTests(unittest.TestCase):
             with self.assertRaises(SystemExit), \
                     contextlib.redirect_stderr(io.StringIO()):
                 v.read_scalar_field(path)
+
+
+class ReviewFixTests(unittest.TestCase):
+    def test_aligned_inertia_is_a_half_step_shift(self):
+        # a linear ramp of the inertia: the average of two steps is the
+        # ramp half a step later; a constant is unchanged
+        cols = {"t": [0.1 * i for i in range(5)],
+                "force": [[0.0, 0, 0]] * 5,
+                "inertia": [[float(i), 0, 0] for i in range(5)]}
+        t, tau = v.aligned_shear_series(cols, 1.0)
+        self.assertEqual(tau[:4], [0.5, 1.5, 2.5, 3.5])
+        self.assertEqual(tau[4], 4.0)
+        cols["inertia"] = [[2.0, 0, 0]] * 5
+        self.assertEqual(v.aligned_shear_series(cols, 2.0)[1], [1.0] * 5)
+
+    def test_check_reports_a_failed_case_as_fail(self):
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d) / "work"
+            work.mkdir()
+            (work / "manifest.json").write_text(
+                '{"cases": {"x": {"state": "failed"}}}')
+            with mock.patch.object(v, "WORK_DIR", work), \
+                    mock.patch.object(v, "CASES_DIR", work / "cases"), \
+                    mock.patch.object(v, "MANIFEST", work / "manifest.json"):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    code = v.main(["check"])
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL: x: the run failed", out.getvalue())
 
 
 if __name__ == "__main__":

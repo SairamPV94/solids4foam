@@ -33,18 +33,18 @@ cd tutorials/fluids/immersedBoundary/oscillatingWallStokesLayer/verification
 ./Allverify tables          # the tables of results.md from the tracked data
 ```
 
-`./Allverify` needs OpenFOAM.com (v2312 or later) with `solids4Foam` and
-`libimmersedBoundary` in the path. Without them the run is reported as
-`SKIPPED`, never as `PASS`.
+`./Allverify` needs OpenFOAM.com (v2412 was used for the tracked results) with
+`solids4Foam` and `libimmersedBoundary` in the path. Without them the run is
+reported as `SKIPPED`, never as `PASS`.
 
 <!-- markdownlint-disable MD013 -->
 
 | Command | What it does |
 | ------- | ------------ |
 | `unit` | the unit tests of the exact solutions, the force and shear conventions, the error analysis and the driver (no solver) |
-| `dry-run --runs R` | lists the cases of the named runs with their ranks and the observed cost; starts nothing |
+| `dry-run --runs R` | lists the cases of the named runs with their ranks; starts nothing |
 | `generate --runs R` | writes the cases to `work/cases/` and records the SHA-256 of their inputs in `work/manifest.json` |
-| `run --runs R` | generate, run and analyse; the default run is `smoke` |
+| `run --runs R` | generate and run (completed cases are kept unless `--force`); the default run is `smoke`; follow with `analyse` and `check` |
 | `status` | state of the cases in the manifest |
 | `analyse` | the result rows of the completed cases, `work/results.csv` |
 | `check` | the exact-solution checks, the consistency of the tracked results, and the completed cases against the tracked rows |
@@ -74,8 +74,10 @@ For each case, over the fourth period (3 < t <= 4 s):
 
 Each is compared with two exact solutions: the periodic solution of the
 tutorial, and the exact solution of the simulated initial-value problem (the
-columns with the suffix `_ivp`), because the start-up transient has not decayed
-in the fourth period (`results.md`, Exact solutions).
+columns with the suffix `_ivp`; the columns with the suffix `_al` are the
+diagnostic with the inertia averaged over two steps, `results.md`, Alignment),
+because the start-up transient has not decayed in the fourth period
+(`results.md`, Exact solutions).
 
 The estimator of the shear is `momentumExchange` and `surfaceTraction` (two
 columns of the same cutLink run), `forcing` (a separate run; the tutorial's
@@ -116,9 +118,11 @@ except where stated: the `dt` run changes only `deltaT`.
 - `images/`: previews written by `scripts/plot_verification.py`; the manuscript
   figures (PDF) are written by the same script without `--png-only`.
 
-`./Allverify tables` regenerates the tables of `results.md`, and `python3
-scripts/plot_verification.py --out images --dpi 110 --png-only` regenerates the
-previews, from the tracked data only.
+The shear, profile and scaling files are written by research export scripts that
+call the analysis functions of the driver on the complete runs; `analyse` writes
+only `work/results.csv`. `./Allverify tables` regenerates the tables of
+`results.md`, and `python3 scripts/plot_verification.py --out images --dpi 110
+--png-only` regenerates the previews, from the tracked data only.
 
 ## Pre-registered criteria
 
@@ -129,9 +133,10 @@ Fixed before the matrix was analysed and not changed afterwards:
   the mean and the first three harmonics, relative to the RMS of the exact shear
   (nothing is filtered or shifted in any reported result);
 - `check` tolerances for a re-run against the tracked row of the same case:
-  `CHECK_SHEAR_AMP` = 0.02 (absolute difference of the amplitude error) and
-  `CHECK_VELOCITY` = 5e-4 (absolute difference of the velocity L2 norm); the
-  closed forms are checked to 1e-8 relative.
+  `CHECK_SHEAR_AMP` = 0.005 (absolute difference of the amplitude error) and
+  `CHECK_VELOCITY` = 2e-4 (absolute difference of the velocity L2 norm); the
+  closed forms are checked to 1e-9 of U0 (shear, velocity) and 1e-8 Pa
+  (amplitude).
 
 ## Limitations
 

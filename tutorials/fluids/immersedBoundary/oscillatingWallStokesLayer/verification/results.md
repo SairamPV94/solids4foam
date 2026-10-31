@@ -15,8 +15,9 @@ with this file).
    from the periodic Stokes solution in the fourth period by 0.43 % of the RMS
    wall shear and by about 1 % of U0 in the velocity. The numerical solutions
    follow the exact initial-value solution (errors against it converge; against
-   the periodic solution they stall at 1.2e-2 of U0 for every method). Both
-   exact solutions are reported; the periodic solution is never altered.
+   the periodic solution they stall at 1.2e-2 of U0 for the methods whose
+   velocity has converged). Both exact solutions are reported; the periodic
+   solution is never altered.
 2. **Velocity.** Against the exact initial-value solution, the L2 norm of the
    `cutLink` velocity is 8.4e-3, 1.6e-3, 5.1e-4 and 6.2e-5 of U0 on Levels 1-4
    (the tutorial step); `ghostCell` 2.2e-2, 5.2e-3, 8.1e-4 and 7.0e-4; `penalty`
@@ -24,22 +25,30 @@ with this file).
    2.2e-2, 7.7e-3 and 1.7e-3. The velocity of `penalty` and `incremental` also
    depends on the time step (Section Time step), and that of `ghostCell` stalls
    near 1e-3 of U0.
-3. **Wall shear.** Which number is reported depends on the estimator. `cutLink`
-   with the `forcing` estimator gives the exact amplitude to 0.44 %, 0.18 %,
-   0.05 % and 0.0002 % (periodic target), but its phase error on Level 1 is -3.7
-   degrees and its RMS error 6.6 %: an accurate amplitude does not make an
-   accurate history. The momentum exchange of `cutLink` is 3.7 %, 3.2 %, 3.2 %
-   low, then 3.1 % high on Levels 1-4; it does not converge, because the
-   interior inertia it contains is 3.5 times the shear amplitude (Section Shear
-   estimators). The surface traction is noisy on the coarse meshes and 0.13 %
-   low on Level 4. `penalty` is 21.7 %, 10.7 %, 5.0 % and 3.6 % low, the legacy
-   `incremental` method 12.3 %, 6.3 %, 3.1 % low and 4.5 % high, `ghostCell` 4.3
-   %, 1.2 %, 0.8 % and 0.8 % low.
-4. **Time step.** Reducing the step at fixed mesh changes the `penalty`
-   amplitude error on Level 4 from -3.5 % to -1.7 % and the legacy `incremental`
-   velocity error on Level 4 by a factor 8. For these methods the time step is
-   as important as the mesh on the finer levels; the tutorial's fixed step
-   (0.001 s) does not isolate the spatial error.
+3. **Wall shear.** The reported number depends on the estimator and, for
+   `penalty`, `incremental` and `ghostCell`, on how the inertia column is
+   aligned in time. `cutLink` with the `forcing` estimator gives the exact
+   amplitude to 0.44 %, 0.18 %, 0.05 % and 0.0002 % (periodic target), but its
+   phase error on Level 1 is -3.7 degrees and its RMS error 6.6 %: an accurate
+   amplitude does not make an accurate history. The momentum exchange of
+   `cutLink` is 3.7 %, 3.2 %, 3.2 % low, then 3.1 % high on Levels 1-4 and does
+   not converge (its interior inertia is 3.5 times the shear amplitude, which
+   may be related: untested). The surface traction is noisy on the coarse meshes
+   and 0.13 % low on Level 4. As the solver writes the inertia, `penalty` is
+   21.7 %, 10.7 %, 5.0 % and 3.6 % low, the legacy `incremental` method 12.3 %,
+   6.3 %, 3.1 % low and 4.5 % high, `ghostCell` 4.3 %, 1.2 %, 0.8 % and 0.8 %
+   low.
+4. **A half-step offset in the force estimate matters.** The inertia column is a
+   backward difference, centred half a step earlier than the forcing. Averaging
+   it over two steps (a post-processing diagnostic, reported next to the
+   solver's own) changes the `ghostCell` amplitude error on Levels 3-4 from
+   -0.80 % and -0.77 % to -0.02 % and +0.01 %, and makes the `penalty` and
+   `incremental` amplitude errors on Levels 2-3 independent of the step; most of
+   the apparent time-step dependence of the shear of these methods is this
+   offset. The velocity is not affected by it, and it does depend on the step
+   for `penalty` and `incremental` (Level 4: 7.4e-3 to 4.1e-3 and 1.7e-3 to
+   2.0e-4), so the tutorial's fixed step does not isolate the spatial error of
+   the velocity either.
 5. **ghostCell** is run as an exploratory method. Its ghost-cell set is constant
    in time, there are no fresh cells, no ghost cell lacks a donor, and a
    four-rank run with cross-processor donors reproduces the serial result to all
@@ -182,13 +191,20 @@ value, fluid at rest):
 Reading of the tables:
 
 - The velocity norms of the three `cutLink` rows are equal: they are one flow.
-- The amplitude errors of `cutLink`, `momentumExchange` do not converge (see
-  below), and the `forcing` estimator is the closest to the exact shear.
-- The tutorial README reports differences from a body-fitted solution; the
-  values here are differences from the exact solution and agree with them to
-  within about 12 % (for example the `cutLink` velocity 9.4e-3, 1.8e-3, 5.8e-4,
-  7.0e-5 there against 8.4e-3, 1.6e-3, 5.1e-4, 6.2e-5 here; the shear RMS of the
-  penalty 28 %, 14 %, 6 %, 4 % there against 28.2 %, 13.8 %, 6.0 %, 4.1 % here).
+- The amplitude errors of the `cutLink` momentum exchange do not converge, and
+  the `forcing` estimator is the closest to the exact shear.
+- The tutorial README reports differences from a body-fitted solution, and here
+  they are differences from the exact solution, over the whole fluid column (the
+  README uses the cells within 6 delta). They agree for some quantities (the
+  `cutLink` velocity 9.4e-3, 1.8e-3, 5.8e-4, 7.0e-5 there against 8.4e-3,
+  1.6e-3, 5.1e-4, 6.2e-5 here; the `penalty` shear RMS 28 %, 14 %, 6 %, 4 %
+  there against 28.2 %, 13.8 %, 6.0 %, 4.1 % here) and not for others: the
+  surface traction on Level 4 (0.7 % there, 1.3 % here), the `forcing` estimate
+  on Level 3 (0.09 % there, 0.49 % periodic or 0.21 % initial-value here) and
+  the `penalty` velocity on Level 3 (1.2e-2 there, 1.1e-2 here). The README
+  states that the momentum-exchange shear converges at first order; here its RMS
+  error is 9.3 %, 5.3 %, 4.4 %, 4.4 % and its amplitude error changes sign, so
+  that statement is not supported by these data.
 
 ## Shear estimators
 
@@ -197,9 +213,9 @@ cells of the slab plus the rate of change of the momentum of the fluid inside
 it. The slab in the mesh is the strip 0 < y < 0.1234 m, so the inertia per wall
 area, rho y_w dU/dt, has the amplitude 0.0775 Pa, which is 3.5 times the shear
 amplitude (0.0222 Pa); the wall shear is the small difference of two large
-terms, and a relative error epsilon in the covered volume appears as 3.5 epsilon
-in the amplitude. The volume of the body in the mesh, sum(lambda V) over the
-exact volume (the column `covered_volume` of `cases.csv`):
+terms, and a relative error epsilon in the covered volume would appear as 3.5
+epsilon in the amplitude. The volume of the body in the mesh, sum(lambda V) over
+the exact volume (the column `covered_volume` of `cases.csv`):
 
 <!-- markdownlint-disable MD013 -->
 
@@ -217,11 +233,13 @@ give -2 %, the amplitude is +4.5 %): the interaction is not isolated here and no
 cause is claimed. The momentum exchange of `cutLink` contains the inertia of the
 cells it covers; its amplitude error (-3.2 % on Levels 2 and 3, +3.1 % on Level
 4, unchanged by the time step) and its sign change between Levels 3 and 4 are a
-property of this estimator at these resolutions; the `forcing` estimator (the
-occupancy volume, which is exact) removes it. The surface traction does not
-contain the interior inertia; its error is dominated by the noise of the fitted
-fluctuations on the coarse meshes (RMS fluctuation 9.9 %, 4.1 %, 3.2 %, 1.2 % of
-the exact RMS on Levels 1-4, against 1e-4 to 5e-4 for the other estimators).
+property of this estimator at these resolutions; the `forcing` estimator (which
+uses the occupancy volume, exact to 1e-4) has a small error; whether the volume
+is the reason was not tested. The surface traction does not contain the interior
+inertia; its time history is noisy on the coarse meshes (RMS fluctuation 9.9 %,
+4.1 %, 3.2 %, 1.2 % of the exact RMS on Levels 1-4, against 1e-4 to 5e-4 for the
+other estimators), which raises its RMS error but does not by itself bias the
+fitted amplitude.
 
 ## Time step
 
@@ -254,24 +272,66 @@ the velocity (both against the initial-value solution).
 
 ![Amplitude error and velocity norm against the time step](images/time_step.png)
 
-- `cutLink`: the amplitude error is independent of the step. The velocity norm
-  depends on it when the step is large (Level 3 at 0.0025 s: 1.7e-3 against
-  2.1e-4 to 2.7e-4 for the smaller steps), and increases slightly when it is
-  reduced on Level 2 (0.9e-3 at 0.0025 s, 2.0e-3 at 0.00025 s): the time error
-  and the spatial error have opposite signs there. At the smallest step the
-  `cutLink` velocity norms on Levels 2-4 are 2.0e-3, 2.7e-4 and 5.7e-5,
-  successive ratios 7.6 and 4.7. These ratios are not a convergence order: the
-  sequence has two ratios and the time error of the tutorial step is still
-  visible at Level 3.
-- `penalty` and `incremental` depend on the step at fixed mesh: on Level 4 the
-  `penalty` amplitude error goes -6.0 %, -3.5 %, -2.2 %, -1.7 % as the step is
-  reduced, its velocity norm 1.1e-2 to 4.1e-3, and the `incremental` velocity
-  norm 4.3e-3 to 2.0e-4. They are not converged in the step at 0.00025 s.
-- `ghostCell`: the amplitude error changes by 0.6 percentage points between the
-  tutorial step and 0.00025 s on every level; the velocity norm on Levels 3-4 at
-  the smallest step is 9.0e-4 and 1.0e-3, a plateau rather than a decrease. The
-  documentation of the method states that its results do not depend on the time
-  step; for this case they depend weakly on it.
+- `cutLink`, momentum exchange: the amplitude error is independent of the step.
+  The surface traction is not (Level 3: -6.2 % at 0.0025 s, +1.5 % at 0.00025
+  s). The velocity norm depends on the step when it is large (Level 3 at 0.0025
+  s: 1.7e-3 against 2.1e-4 to 2.7e-4 for the smaller steps) and increases
+  slightly when it is reduced on Level 2 (0.9e-3 at 0.0025 s, 2.0e-3 at 0.00025
+  s), which would be consistent with time and spatial errors of opposite sign
+  (signed errors not measured). At the smallest step the `cutLink` velocity
+  norms on Levels 2-4 are 2.0e-3, 2.7e-4 and 5.7e-5, successive ratios 7.6 and
+  4.7: ratios of two pairs, not a convergence order, and the time error of the
+  tutorial step is still visible at Level 3.
+- `penalty` and `incremental`: the velocity depends on the step at fixed mesh
+  (Level 4: `penalty` 1.1e-2 to 4.1e-3, `incremental` 4.3e-3 to 2.0e-4, not
+  converged at 0.00025 s). The amplitude error of the shear as written depends
+  on the step too, but largely through the half-step offset of the next section.
+- `ghostCell`: the velocity norm on Levels 3-4 at the smallest step is 9.0e-4
+  and 1.0e-3, a plateau rather than a decrease; the amplitude error shifts by
+  0.57 percentage points between the tutorial step and 0.00025 s on every level,
+  which is the order of the half-step offset (below) and not evidence of a
+  dependence of the method on the step.
+
+## Alignment of the inertia in time
+
+The force of `penalty`, `incremental` and `ghostCell` is the forcing at t_n plus
+the inertia column, a backward difference (M_n - M_(n-1))/dt centred at t_n -
+dt/2. The tables above use the columns as the solver writes them, as the
+tutorial's plot does. The diagnostic below averages the inertia over two
+successive steps (centring it at t_n), against the initial-value solution:
+
+<!-- markdownlint-disable MD013 -->
+
+| Method | Level | dt (s) | Amplitude error | Phase error (deg) | RMS error | Amplitude error, aligned | Phase error, aligned | RMS error, aligned |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| penalty | 2 | 0.001 | -10.73 % | -5.21 | 13.74 % | -9.88 % | -5.66 | 13.62 % |
+| penalty | 2 | 0.00025 | -10.10 % | -5.55 | 13.65 % | -9.89 % | -5.66 | 13.63 % |
+| penalty | 3 | 0.001 | -4.98 % | -1.92 | 5.95 % | -4.18 % | -2.37 | 5.81 % |
+| penalty | 3 | 0.00025 | -4.38 % | -2.26 | 5.84 % | -4.18 % | -2.37 | 5.82 % |
+| penalty | 4 | 0.001 | -3.54 % | -1.15 | 4.06 % | -2.75 % | -1.60 | 3.89 % |
+| penalty | 4 | 0.00025 | -1.69 % | -0.75 | 2.13 % | -1.49 % | -0.86 | 2.11 % |
+| incremental | 2 | 0.001 | -6.30 % | -2.34 | 7.44 % | -5.51 % | -2.79 | 7.26 % |
+| incremental | 2 | 0.00025 | -5.74 % | -2.69 | 7.33 % | -5.54 % | -2.80 | 7.30 % |
+| incremental | 3 | 0.001 | -3.06 % | -1.14 | 3.64 % | -2.27 % | -1.59 | 3.56 % |
+| incremental | 3 | 0.00025 | -2.66 % | -1.48 | 3.68 % | -2.46 % | -1.59 | 3.68 % |
+| incremental | 4 | 0.001 | +4.50 % | +1.02 | 4.86 % | +5.26 % | +0.60 | 5.37 % |
+| incremental | 4 | 0.00025 | +4.01 % | +0.99 | 4.38 % | +4.20 % | +0.88 | 4.48 % |
+| ghostCell (exploratory) | 2 | 0.001 | -1.18 % | -0.95 | 2.03 % | -0.38 % | -1.39 | 2.45 % |
+| ghostCell (exploratory) | 2 | 0.00025 | -0.61 % | -1.31 | 2.37 % | -0.41 % | -1.42 | 2.51 % |
+| ghostCell (exploratory) | 3 | 0.001 | -0.80 % | +0.33 | 0.99 % | -0.02 % | -0.11 | 0.20 % |
+| ghostCell (exploratory) | 3 | 0.00025 | -0.23 % | -0.04 | 0.24 % | -0.04 % | -0.15 | 0.26 % |
+| ghostCell (exploratory) | 4 | 0.001 | -0.77 % | +0.28 | 0.91 % | +0.01 % | -0.17 | 0.30 % |
+| ghostCell (exploratory) | 4 | 0.00025 | -0.20 % | -0.15 | 0.33 % | -0.00 % | -0.26 | 0.45 % |
+
+<!-- markdownlint-enable MD013 -->
+
+With this alignment the `ghostCell` amplitude error on Levels 3-4 is below 0.05
+% and the RMS error 0.2-0.3 % at both steps; the `penalty` and `incremental`
+errors on Levels 2-3 no longer depend on the step. The aligned values are a
+post-processing variant of the same runs; nothing in the solver output is
+changed or shifted in the tables of the results. What remains for `penalty`
+(-2.8 % to -1.5 % on Level 4) and `incremental` (+4 % to +5 % on Level 4) is not
+explained by the alignment.
 
 ## ghostCell: applicability and parallel behaviour
 
@@ -284,8 +344,8 @@ the body velocity at the nearest surface point, which here is the tangential
 velocity U0 sin(omega t); this is evaluated each step. The documented
 restriction to static bodies concerns the cells that a moving body leaves (fresh
 cells), which do not occur here. The method is therefore applied and reported,
-but as exploratory: the plateau of its velocity norm and its weak step
-dependence above are unexplained, and the method has no wide coverage.
+but as exploratory: the plateau of its velocity norm is unexplained, and the
+method has no wide coverage.
 
 Parallel: the `penalty`, `incremental` and `ghostCell` runs of Level 3 on four
 ranks, decomposed in slabs along y (so that the interface and the donors cross
@@ -321,8 +381,8 @@ are run in serial.
 - The errors of the sequences of levels at the tutorial step contain time error
   (Section Time step); no formal order is claimed.
 - The shear of `penalty`, `incremental` and `ghostCell` is a small difference of
-  two large terms; its error is sensitive to the covered volume and the time
-  step.
+  two large terms; its error is sensitive to the time alignment of the inertia
+  (Section Alignment) and possibly to the covered volume.
 - The shear amplitude and phase are those of the fitted fundamental; the noise
   is relative to the fit of the mean and three harmonics.
 - `ghostCell` is exploratory and was run on this case with an invariant surface
