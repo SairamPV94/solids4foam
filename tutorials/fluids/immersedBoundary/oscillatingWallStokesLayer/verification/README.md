@@ -1,13 +1,12 @@
 # Verification of the oscillating-wall Stokes layer
 
 This directory verifies `oscillatingWallStokesLayer` against the **exact**
-solution of the Stokes second problem, for the four immersed-boundary methods
-of `immersedBoundaryForce`: `cutLink` (with the momentum exchange and the
-surface traction as two estimators of the same run, and the `forcing`
-estimator as a third), `penalty`, the legacy `incremental` method and
-(exploratory) `ghostCell`. Nothing in the tutorial or in `src/` is changed:
-every case is a copy of the tutorial with the method settings written into
-`constant/fvOptions`.
+solution of the Stokes second problem, for the four immersed-boundary methods of
+`immersedBoundaryForce`: `cutLink` (with the momentum exchange and the surface
+traction as two estimators of the same run, and the `forcing` estimator as a
+third), `penalty`, the legacy `incremental` method and (exploratory)
+`ghostCell`. Nothing in the tutorial or in `src/` is changed: every case is a
+copy of the tutorial with the method settings written into `constant/fvOptions`.
 
 Three kinds of statement are kept apart in `results.md`:
 
@@ -53,12 +52,12 @@ cd tutorials/fluids/immersedBoundary/oscillatingWallStokesLayer/verification
 
 <!-- markdownlint-enable MD013 -->
 
-Named runs: `smoke` (Level 1), `L1` to `L4` (all variants of a level),
-`matrix` (Levels 1-4, the tracked matrix) and `dt` (the time-step control,
-36 cases). `--methods`, `--levels` and `--ranks` select within them. The
-matrix is about 12 serial minutes on one core of a recent node (the observed
-wall times are in `reference/results/cases.csv`), and the time-step run about
-an hour; both are opt-in and neither is part of the CI of the repository.
+Named runs: `smoke` (Level 1), `L1` to `L4` (all variants of a level), `matrix`
+(Levels 1-4, the tracked matrix) and `dt` (the time-step control, 36 cases).
+`--methods`, `--levels` and `--ranks` select within them. The matrix is about 12
+serial minutes on one core of a recent node (the observed wall times are in
+`reference/results/cases.csv`), and the time-step run about an hour; both are
+opt-in and neither is part of the CI of the repository.
 
 ## What is computed
 
@@ -81,8 +80,8 @@ in the fourth period (`results.md`, Exact solutions).
 The estimator of the shear is `momentumExchange` and `surfaceTraction` (two
 columns of the same cutLink run), `forcing` (a separate run; the tutorial's
 `forceEstimator forcing`) for cutLink, and the forcing plus the rate of change
-of the momentum of the fluid inside the slab (columns 2 and 8 of the force
-file, as in the tutorial's plot) for `penalty`, `incremental` and `ghostCell`.
+of the momentum of the fluid inside the slab (columns 2 and 8 of the force file,
+as in the tutorial's plot) for `penalty`, `incremental` and `ghostCell`.
 
 ## Settings
 
@@ -100,8 +99,8 @@ explicitly into every case:
 
 <!-- markdownlint-enable MD013 -->
 
-The time step is the 0.001 s of the tutorial (`backward`), also for the
-controls except where stated: the `dt` run changes only `deltaT`.
+The time step is the 0.001 s of the tutorial (`backward`), also for the controls
+except where stated: the `dt` run changes only `deltaT`.
 
 ## Tracked data
 
@@ -112,12 +111,14 @@ controls except where stated: the `dt` run changes only `deltaT`.
   step of the fourth period, with the two exact solutions;
 - `reference/results/profiles-L<k>.csv`: the row-averaged velocity at t/T = 0,
   0.25, 0.5, 0.75 of the fourth period, with the two exact solutions;
+- `reference/results/scaling.csv`: wall time of the Level 4 `penalty` case on 1,
+  2, 4 and 8 ranks over the first second;
 - `images/`: previews written by `scripts/plot_verification.py`; the manuscript
   figures (PDF) are written by the same script without `--png-only`.
 
-`./Allverify tables` regenerates the tables of `results.md`, and
-`python3 scripts/plot_verification.py --out images --dpi 110 --png-only`
-regenerates the previews, from the tracked data only.
+`./Allverify tables` regenerates the tables of `results.md`, and `python3
+scripts/plot_verification.py --out images --dpi 110 --png-only` regenerates the
+previews, from the tracked data only.
 
 ## Pre-registered criteria
 
@@ -134,11 +135,10 @@ Fixed before the matrix was analysed and not changed afterwards:
 
 ## Limitations
 
-See `results.md`, Limitations. In short: single runs on a shared node (the
-costs are observations, not performance models), a periodic-target and
-an initial-value-target comparison that differ by 0.43 % of the shear
-(0.012 of U0 in velocity), no formal convergence order is claimed from the
-Level sequences (the time step is not refined with the mesh), `ghostCell` is
-exploratory, and the shear of `penalty`, `incremental` and `ghostCell` is a
-small
-difference of two large terms.
+See `results.md`, Limitations. In short: single runs on a shared node (the costs
+are observations, not performance models), a periodic-target and an
+initial-value-target comparison that differ by 0.43 % of the shear (0.012 of U0
+in velocity), no formal convergence order is claimed from the Level sequences
+(the time step is not refined with the mesh), `ghostCell` is exploratory, and
+the shear of `penalty`, `incremental` and `ghostCell` is a small difference of
+two large terms.
