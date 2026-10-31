@@ -32,18 +32,18 @@ cd tutorials/fluids/immersedBoundary/immersedTaylorCouette/verification
 ./Allverify tables          # the tables of results.md from the tracked data
 ```
 
-`./Allverify` needs OpenFOAM.com (v2312 or later) with `solids4Foam` and
-`libimmersedBoundary` in the path. Without them the run is reported as
-`SKIPPED`, never as `PASS`.
+`./Allverify` needs OpenFOAM.com (v2412 was used for the tracked results) with
+`solids4Foam` and `libimmersedBoundary` in the path. Without them the run is
+reported as `SKIPPED`, never as `PASS`.
 
 <!-- markdownlint-disable MD013 -->
 
 | Command | What it does |
 | ------- | ------------ |
 | `unit` | the unit tests of the exact solution, the torque convention, the error analysis and the driver (no solver) |
-| `dry-run --runs R` | lists the cases of the named runs with their ranks and the observed cost; starts nothing |
+| `dry-run --runs R` | lists the cases of the named runs with their ranks; starts nothing |
 | `generate --runs R` | writes the cases to `work/cases/` and records the SHA-256 of their inputs in `work/manifest.json` |
-| `run --runs R` | generate, run and analyse; the default run is `smoke` |
+| `run --runs R` | generate and run (completed cases are kept unless `--force`); the default run is `smoke`; follow with `analyse` and `check` |
 | `status` | state of the cases in the manifest |
 | `analyse` | the result rows of the completed cases, `work/results.csv` |
 | `check` | the exact-solution checks, the consistency of the tracked results, and the completed cases against the tracked rows |
@@ -120,13 +120,17 @@ cells halve with each level, so does the step. The `dt` run adds `maxDeltaT`
 - `images/`: previews written by `scripts/plot_verification.py`; the manuscript
   figures (PDF) are written by the same script without `--png-only`.
 
-`./Allverify tables` regenerates the tables of `results.md`, and `python3
-scripts/plot_verification.py --out images --dpi 110 --png-only` regenerates the
-previews, from the tracked data only.
+The histories, profiles and scaling files are written by research export scripts
+that call the analysis functions of the driver on the complete runs; `analyse`
+writes only `work/results.csv`. `./Allverify tables` regenerates the tables of
+`results.md`, and `python3 scripts/plot_verification.py --out images --dpi 110
+--png-only` regenerates the previews, from the tracked data only.
 
 ## Pre-registered criteria
 
-Fixed before the matrix was analysed and not changed afterwards:
+Fixed before the matrix was analysed (the steady criterion compares the end
+values of the window, which is noisy for oscillating cases; it was kept as
+defined and the flag is not compared by `check` when it is near the threshold):
 
 - the comparison window is 8 <= t <= 10 s for every method; the steady criteria
   are 1e-3 for the drift of the torque and for the change of the velocity;

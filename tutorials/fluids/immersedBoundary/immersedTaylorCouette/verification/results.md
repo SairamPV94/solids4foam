@@ -25,19 +25,21 @@ with this file).
    No cause is claimed.
 4. **penalty** is -25.3 %, -16.2 %, -10.0 % and -5.8 % from the exact torque on
    Levels 1-4 at the tutorial step (velocity L2 norm 9.3e-2, 5.9e-2, 3.6e-2 and
-   2.1e-2): the effective walls are displaced into the bodies. The legacy
-   `incremental` method is -5.9 %, +0.2 %, -0.5 % and -0.7 %, and `ghostCell`
-   +1.06 %, +0.19 %, -0.27 % and -0.05 %.
+   2.1e-2): the effective walls are displaced into the bodies, as the tutorial
+   README states (not measured here). The legacy `incremental` method is -5.9 %,
+   +0.2 %, -0.5 % and -0.7 %, and `ghostCell` +1.06 %, +0.19 %, -0.27 % and
+   -0.05 %.
 5. **The tutorial's time step is part of every difference.** The step is limited
    by the Courant number and so halves with each level. With the step capped at
    0.01 s or less, the `penalty` torque difference goes from -25.3 % to -13.4 %
-   on Level 1 and from -16.2 % to -7.0 % on Level 2 (converged in the step to
-   0.1 %), and the legacy `incremental` torque on Level 2 goes from +0.2 % to
-   +7.9 %: the apparently good tutorial value is a cancellation of a spatial and
-   a temporal error. `ghostCell` on Levels 1-2 and `cutLink` on Level 1 also
-   depend on the step, less strongly (Section Time step). The sequence of Levels
-   at the tutorial step is not a spatial convergence study, and no formal order
-   is claimed from it.
+   on Level 1 and from -16.2 % to -7.0 % on Level 2 (the means of the capped
+   steps agree within the window uncertainty of about 0.5 points), and the
+   legacy `incremental` torque on Level 2 goes from +0.2 % to +7.9 %: the
+   apparently good tutorial value is consistent with a cancellation of a spatial
+   and a temporal error (neither is converged). `ghostCell` on Levels 1-2 and
+   `cutLink` on Level 1 also depend on the step, less strongly (Section Time
+   step). The sequence of Levels at the tutorial step is not a spatial
+   convergence study, and no formal order is claimed from it.
 6. **ghostCell** is exploratory. The rotor surface does not change position in
    the mesh, the ghost-cell set is constant, no ghost cell lacks a donor, and a
    four-rank run with cross-processor donors reproduces the serial result.
@@ -60,7 +62,7 @@ with this file).
 | fluid | nu = 1e-3 m^2/s, rho = 1, Reynolds number omega R1 (R2 - R1)/nu = 2.5 | `constant/transportProperties` |
 | mesh | square of side 0.32 m, 32, 64, 128, 256 cells across (10, 20, 40, 80 across the rotor), one cell 0.1 m thick | `blockMeshDict` |
 | centre of rotation and torque axis | origin, z (the same for both bodies) | `CofR`, `motion` |
-| time | to 10 s, adaptive step with Courant number 0.5 (mean step about 0.095, 0.050, 0.025, 0.013 s on the Levels) | `controlDict` |
+| time | to 10 s, adaptive step with Courant number 0.5 (mean step about 0.09, 0.05, 0.025, 0.013 s on the Levels) | `controlDict` |
 | window of the mean | 8 <= t <= 10 s, the same for every method | predefined |
 
 <!-- markdownlint-enable MD013 -->
@@ -144,11 +146,13 @@ allocated ranks times the wall time of the job, observed on a shared node.
 Reading of the table:
 
 - All rows are steady by the predefined criteria except `penalty` on Level 1
-  (drift 1.5e-3, a persistent oscillation of the torque of about 0.15 %): its
-  mean and standard deviation are reported and it is not called converged. The
-  persistent oscillation of `penalty` (relative standard deviation 5e-4 to
-  1.3e-3) is the largest, `incremental` has none (1e-7), the `cutLink` momentum
-  exchange has 1e-5 to 1e-4 and the surface traction 2e-4 to 9e-4.
+  (endpoint drift 1.5e-3 against 1e-3; the criterion compares the two end values
+  of the window, so it also responds to oscillation, and the flag is not robust
+  near the threshold: the surface traction on Level 3 is at 9.6e-4): its mean
+  and standard deviation are reported and it is not called converged. The
+  relative standard deviation of the torque in the window is 5e-4 to 1.3e-3 for
+  `penalty` and 2e-4 to 9e-4 for the surface traction, 1e-5 to 1e-4 for the
+  momentum exchange, 2e-5 to 1e-4 for `ghostCell` and 1e-7 for `incremental`.
 - The velocity norms of the three `cutLink` rows are equal: they are one flow
   (one run each, the torque column being the estimator selected in that run).
   The momentum exchange and the `forcing` estimate give the same torque to the
@@ -166,7 +170,7 @@ Reading of the table:
 ## Time step
 
 The tutorial's step is limited by the Courant number and so halves with each
-level (mean step about 0.095, 0.050, 0.025 and 0.013 s), which makes the mesh
+level (mean step about 0.09, 0.05, 0.025 and 0.013 s), which makes the mesh
 levels a study of space and time together. The control caps the step with
 `maxDeltaT` (0.01, 0.005 and 0.0025 s). The cells give the torque difference and
 the velocity L2 norm.
@@ -181,13 +185,13 @@ the velocity L2 norm.
 | cutLink, surface traction | 1 | -2.06 % / 6.87e-03 | -2.26 % / 7.56e-03 | -2.38 % / 7.98e-03 | -2.54 % / 8.51e-03 |
 | cutLink, surface traction | 2 | -2.39 % / 2.29e-03 | -2.41 % / 2.40e-03 | -2.44 % / 2.51e-03 | -2.48 % / 2.69e-03 |
 | cutLink, surface traction | 3 | -2.83 % / 9.58e-04 | -2.84 % / 9.69e-04 | -2.84 % / 9.85e-04 | n/a |
-| penalty | 1 | -25.27 % / 9.33e-02 | -13.46 % / 4.85e-02 | -13.43 % / 4.84e-02 | -13.40 % / 4.83e-02 |
-| penalty | 2 | -16.15 % / 5.92e-02 | -8.81 % / 3.26e-02 | -7.04 % / 2.58e-02 | -7.03 % / 2.58e-02 |
-| penalty | 3 | -9.96 % / 3.63e-02 | -7.93 % / 2.88e-02 | -6.18 % / 2.25e-02 | n/a |
-| incremental | 1 | -5.93 % / 6.04e-02 | +1.73 % / 5.35e-02 | +1.92 % / 5.45e-02 | +3.35 % / 5.10e-02 |
-| incremental | 2 | +0.24 % / 2.01e-02 | +7.15 % / 2.16e-02 | +7.74 % / 2.53e-02 | +7.88 % / 2.72e-02 |
+| penalty | 1 | -25.27 % / 9.33e-02 * | -13.46 % / 4.85e-02 * | -13.43 % / 4.84e-02 * | -13.40 % / 4.83e-02 * |
+| penalty | 2 | -16.15 % / 5.92e-02 | -8.81 % / 3.26e-02 * | -7.04 % / 2.58e-02 * | -7.03 % / 2.58e-02 * |
+| penalty | 3 | -9.96 % / 3.63e-02 | -7.93 % / 2.88e-02 * | -6.18 % / 2.25e-02 | n/a |
+| incremental | 1 | -5.93 % / 6.04e-02 | +1.73 % / 5.35e-02 * | +1.92 % / 5.45e-02 * | +3.35 % / 5.10e-02 * |
+| incremental | 2 | +0.24 % / 2.01e-02 | +7.15 % / 2.16e-02 | +7.74 % / 2.53e-02 | +7.88 % / 2.72e-02 * |
 | incremental | 3 | -0.54 % / 1.39e-02 | +3.04 % / 6.48e-03 | +4.62 % / 7.90e-03 | n/a |
-| ghostCell (exploratory) | 1 | +1.06 % / 1.65e-02 | +1.75 % / 2.00e-02 | +2.09 % / 2.16e-02 | +2.44 % / 2.33e-02 |
+| ghostCell (exploratory) | 1 | +1.06 % / 1.65e-02 | +1.75 % / 2.00e-02 * | +2.09 % / 2.16e-02 * | +2.44 % / 2.33e-02 |
 | ghostCell (exploratory) | 2 | +0.19 % / 6.67e-03 | +0.39 % / 7.53e-03 | +0.50 % / 8.14e-03 | +0.66 % / 9.00e-03 |
 | ghostCell (exploratory) | 3 | -0.27 % / 2.94e-03 | -0.23 % / 3.01e-03 | -0.20 % / 3.07e-03 | n/a |
 
@@ -201,14 +205,19 @@ the velocity L2 norm.
   s) is not yet converged in the step. At converged steps the torque differences
   on Levels 1 and 2 are -13.4 % and -7.0 %, a ratio of 1.9; the tutorial values
   -25.3 % and -16.2 % contain a time error of 12 and 9 percentage points. This
-  is two levels, not an order. With a capped step several `penalty` runs are not
-  steady by the predefined criteria (a persistent oscillation of the torque):
-  their means are reported as such.
+  is two levels, not an order. With a capped step most `penalty` runs are not
+  steady by the predefined criteria (endpoint drift of 4e-3 to 8e-3 on Level 1
+  and Level 2, which moves the mean over the window by about 0.5 percentage
+  points): the means are window-dependent at that level, the differences between
+  the capped steps (0.03 points) are below it, and "converged in the step" means
+  that the means are the same within the window uncertainty. Non-steady cells of
+  the table are marked with an asterisk.
 - `incremental`: the torque difference at a capped step is positive and keeps
   changing with the step (Level 2: +7.2 %, +7.7 %, +7.9 %; Level 1: +1.7 %, +1.9
   %, +3.4 %; Level 3: +3.0 %, +4.6 %), whereas the tutorial value is +0.24 % on
-  Level 2: it is a cancellation of a spatial error and a temporal error. The
-  method's documentation says that its results depend on the step.
+  Level 2: it is consistent with a cancellation of a spatial error and a
+  temporal error (neither is isolated). The method's documentation says that its
+  results depend on the step.
 - `ghostCell`: the torque difference grows as the step is reduced on Levels 1-2
   (Level 1: +1.06 % at the tutorial step, then +1.75 %, +2.09 %, +2.44 %; Level
   2: +0.19 %, +0.39 %, +0.50 %, +0.66 %) and hardly changes on Level 3 (-0.27 %,
@@ -238,13 +247,15 @@ every level, supports the momentum exchange against the surface traction (which
 differs from it by 3 to 4 percentage points), and differs by 2 to 4 % for the
 legacy `incremental` method (on Level 2: forcing torque +0.2 %, field torque
 -3.2 %), for which the forcing torque is therefore not the torque transmitted
-through the fluid. The torque on the stator, which should be equal and opposite,
+through the fluid. The torque on the stator, which should be equal and opposite
+(in the capped-step runs the sums reach 4.3 times (`ghostCell`) and 1.2 times
+(`incremental`) the exact torque, and so their stator torque is not meaningful),
 is reported (`T_stator_balance`) but not used: relative to the exact torque, the
-sum of the two torques is 0.7-1.6 % for the `cutLink` surface traction, 5-8 %
+sum of the two torques is 0.4-1.6 % for the `cutLink` surface traction, 5-8 %
 for its momentum exchange, 7-10 % for `penalty`, 20-43 % for `incremental` and
 between +1 % and -39 % without a trend for `ghostCell`; the estimators sum the
-forcing of a 0.15 m wide annulus and were not designed for it (the rotor is the
-quantity of the benchmark).
+forcing of a 0.15 m wide annulus and may not be suited to it (not tested; the
+rotor is the quantity of the benchmark).
 
 ## ghostCell: applicability and parallel behaviour
 
@@ -296,6 +307,8 @@ ranks: 161 s (102 % efficiency); 4 ranks: 90 s (91 % efficiency); 8 ranks: 59 s
   `incremental`, `ghostCell` on Levels 1-2 and `penalty` on Level 3).
 - The torque of `penalty`, `incremental` and `ghostCell` is the forcing torque,
   equal to the torque on the rotor only in the steady state.
+- The stator torque of the `cutLink` momentum exchange is 5-8 % low while the
+  rotor torque is within 1 %; this estimator inconsistency is not explained.
 - The surface-traction torque of `cutLink` does not converge on this hierarchy
   and its cause is not identified.
 - The velocity is compared at the cell centres with the exact point values, not

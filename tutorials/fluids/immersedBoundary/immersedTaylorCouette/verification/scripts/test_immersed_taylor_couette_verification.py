@@ -469,5 +469,36 @@ class TrackedResultTests(unittest.TestCase):
         self.assertIn(table.strip(), md.read_text())
 
 
+class ReviewFixTests(unittest.TestCase):
+    def test_check_reports_a_failed_case_as_fail(self):
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d) / "work"
+            work.mkdir()
+            (work / "manifest.json").write_text(
+                '{"cases": {"x": {"state": "failed"}}}')
+            with mock.patch.object(v, "WORK_DIR", work), \
+                    mock.patch.object(v, "CASES_DIR", work / "cases"), \
+                    mock.patch.object(v, "MANIFEST", work / "manifest.json"):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    code = v.main(["check"])
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL: x: the run failed", out.getvalue())
+
+    def test_unsteady_cells_are_marked_in_the_time_step_table(self):
+        base = {"method": "penalty", "estimator": "", "level": 1, "dt_cap": "",
+                "T_relerr": "-0.1", "ut_L2": "0.01", "steady": "0"}
+        table = v.time_step_table([base])
+        self.assertIn("-10.00 % / 1.00e-02 *", table)
+
+    def test_steady_flag_comparison_is_skipped_near_the_threshold(self):
+        row = {"method": "penalty", "estimator": "", "level": 1,
+               "T_relerr": "0", "ut_L2": "0", "steady": "1"}
+        near = dict(row, steady="0", T_drift_rel="1.2e-3")
+        self.assertEqual(v.check_case(row, near)[-1][0], "SKIPPED")
+        far = dict(row, steady="0", T_drift_rel="1e-2")
+        self.assertEqual(v.check_case(row, far)[-1][0], "FAIL")
+
+
 if __name__ == "__main__":
     unittest.main()
